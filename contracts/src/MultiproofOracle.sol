@@ -178,12 +178,8 @@ contract MultiproofOracle is IMultiproofOracle {
             return;
         }
 
-        // Otherwise, it means the proposal was challenged and not fully proven.
         proposal.state = ProposalState.Rejected;
 
-        // The treasury fee here MUST be substantial enough to deter the attack where an attacker:
-        // (a) proposes false root, (b) challenges self, (c) emergency pause to DOS the system.
-        // We can calculate this cost as `proposalBond * treasuryFeePctWad / 1e18 * emergencyPauseThreshold`.
         uint treasuryFee = proposalBond * treasuryFeePctWad / 1e18;
         uint proposalBondRewards = proposalBond - treasuryFee;
         uint challangeBondRefund = proofReward * (provers.length - successfulProofCount);
