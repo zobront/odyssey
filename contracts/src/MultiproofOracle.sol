@@ -73,6 +73,7 @@ contract MultiproofOracle is IMultiproofOracle {
 
     function propose(Challenge memory parent, uint256 blockNum, bytes32 outputRoot) public payable {
         require(msg.value == proposalBond, "incorrect bond amount");
+        require(!emergencyShutdown, "emergency shutdown");
 
         proposals[blockNum][outputRoot].push(ProposalData({
             proposer: msg.sender,
@@ -86,6 +87,7 @@ contract MultiproofOracle is IMultiproofOracle {
     }
 
     function challenge(uint256 blockNum, bytes32 outputRoot, uint256 index) public payable {
+        require(!emergencyShutdown, "emergency shutdown");
         require(msg.value == proofReward * provers.length, "incorrect bond amount");
 
         ProposalData storage proposal = proposals[blockNum][outputRoot][index];
@@ -98,6 +100,7 @@ contract MultiproofOracle is IMultiproofOracle {
     }
 
     function prove(uint256 blockNum, bytes32 outputRoot, uint256 index, ProofData[] memory proofs) public {
+        require(!emergencyShutdown, "emergency shutdown");
         ProposalData storage proposal = proposals[blockNum][outputRoot][index];
         require(proposal.state == ProposalState.Challenged, "can only prove challenged proposals");
         require(proposal.deadline > block.timestamp, "deadline passed");
@@ -125,6 +128,7 @@ contract MultiproofOracle is IMultiproofOracle {
     }
 
     function finalize(uint256 blockNum, bytes32 outputRoot, uint256 index) public {
+        require(!emergencyShutdown, "emergency shutdown");
         ProposalData storage proposal = proposals[blockNum][outputRoot][index];
         require(!isFinalized(proposal.state), "proposal already finalized");
 
@@ -248,16 +252,5 @@ contract MultiproofOracle is IMultiproofOracle {
 
     function isValidProposal(uint256 blockNum, bytes32 outputRoot, uint256 index) public view returns (bool) {
         return proposals[blockNum][outputRoot][index].state == ProposalState.Confirmed;
-    }
-
-    function allEmergencyPauseChallengesAreRejected(address pauser) public view returns (bool) {
-        uint length = emergencyPauseData[pauser].challenges.length;
-        for (uint i = 0; i < length; i++) {
-            Challenge memory c = emergencyPauseData[pauser].challenges[i];
-            if (proposals[c.blockNum][c.outputRoot][c.index].state != ProposalState.Rejected) {
-                return false;
-            }
-        }
-        return true;
     }
 }
