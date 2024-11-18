@@ -11,7 +11,6 @@ interface IMultiproofOracle {
         uint64 treasuryFeePctWad;
         address treasury;
         uint16 emergencyPauseThreshold;
-        uint96 emergencyBond;
         uint40 emergencyPauseTime;
     }
 

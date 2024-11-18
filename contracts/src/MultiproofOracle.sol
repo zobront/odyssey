@@ -12,25 +12,25 @@ contract MultiproofOracle is IMultiproofOracle {
 
     uint8 public constant VERSION = 1;
 
-    uint256 immutable proposalBond;
-    uint256 immutable challengeTime;
+    uint256 public immutable proposalBond;
+    uint256 public immutable challengeTime;
 
-    uint256 immutable proofReward; // to challenge, we must bond `proofReward * provers.length`
-    uint256 immutable provingTime;
+    uint256 public immutable proofReward; // to challenge, we must bond `proofReward * provers.length`
+    uint256 public immutable provingTime;
 
     mapping(uint256 blockNum => mapping(bytes32 outputRoot => ProposalData[])) public proposals;
     IProver[] public provers;
 
-    uint256 treasuryFeePctWad;
-    address treasury;
+    uint256 public treasuryFeePctWad;
+    address public treasury;
 
-    uint256 immutable emergencyPauseThreshold;
-    uint256 immutable emergencyPauseTime;
-    bool emergencyPaused;
-    uint40 emergencyPauseDeadline;
+    uint256 public immutable emergencyPauseThreshold;
+    uint256 public immutable emergencyPauseTime;
+    bool public emergencyPaused;
+    uint40 public emergencyPauseDeadline;
     Challenge[] emergencyPauseChallenges;
 
-    bool emergencyShutdown;
+    bool public emergencyShutdown;
 
     ///////////////////////////////
     ///////// CONSTRUCTOR /////////
@@ -40,16 +40,16 @@ contract MultiproofOracle is IMultiproofOracle {
         require(_provers.length < 40); // proven bitmap has to fit in uint40
         provers = _provers;
 
-        // set params
+        // set params - for details on how to set: https://github.com/zobront/odyssey/blob/multiproof/contracts/spec/params.md
         require(_args.treasuryFeePctWad < 1e18, "treasury fee must be less than 100%");
-        proposalBond = _args.proposalBond;                       // sane default: 3 ETH
-        challengeTime = _args.challengeTime;                     // sane default: 12 hours
-        proofReward = _args.proofReward;                         // sane default: 1 ETH
-        provingTime = _args.provingTime;                         // sane default: 1 day
-        treasuryFeePctWad = _args.treasuryFeePctWad;             // sane default: 50%
+        proposalBond = _args.proposalBond;
+        challengeTime = _args.challengeTime;
+        proofReward = _args.proofReward;
+        provingTime = _args.provingTime;
+        treasuryFeePctWad = _args.treasuryFeePctWad;
         treasury = _args.treasury;
-        emergencyPauseThreshold = _args.emergencyPauseThreshold; // sane default: 200
-        emergencyPauseTime = _args.emergencyPauseTime;           // sane default: 10 days
+        emergencyPauseThreshold = _args.emergencyPauseThreshold;
+        emergencyPauseTime = _args.emergencyPauseTime;
 
         // initialize anchor state with Confirmed status
         proposals[_initialBlockNum][_initialOutputRoot].push(ProposalData({
@@ -143,7 +143,7 @@ contract MultiproofOracle is IMultiproofOracle {
 
         uint successfulProofCount;
         for (uint i = 0; i < provers.length; i++) {
-            if (proposal.provenBitmap & (1 << i) == 1) {
+            if (proposal.provenBitmap & (1 << i) != 0) {
                 successfulProofCount++;
             }
         }
@@ -209,11 +209,11 @@ contract MultiproofOracle is IMultiproofOracle {
         for (uint i = 0; i < challenges.length; i++) {
             Challenge memory c = challenges[i];
             require(proposals[c.blockNum][c.outputRoot][c.index].state == ProposalState.Challenged, "proposal not confirmed");
+            emergencyPauseChallenges.push(c);
         }
 
         emergencyPaused = true;
         emergencyPauseDeadline = uint40(block.timestamp + emergencyPauseTime);
-        emergencyPauseChallenges = challenges;
     }
 
     function endPause() public {
@@ -224,6 +224,8 @@ contract MultiproofOracle is IMultiproofOracle {
         delete emergencyPauseDeadline;
         delete emergencyPauseChallenges;
     }
+
+    // TODO: Point out contradiction for same block and emergencyShutdown.
 
     ///////////////////////////////
     //////////// VIEWS ////////////
