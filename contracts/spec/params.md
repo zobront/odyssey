@@ -1,7 +1,7 @@
 ## Team Inputs
 
-- `teamC`: amount the team can afford
-- `minReward`: minimum reward to incentivize provers
+- `teamC`: amount the team can afford for challenges in an emergency
+- `minReward`: minimum reward needed to incentivize provers
 - `numP`: number of proof systems
 
 ## Parameters
