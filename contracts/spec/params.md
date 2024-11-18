@@ -1,23 +1,23 @@
 ## Team Inputs
 
-- teamC: amount the team can afford
-- minReward: minimum reward to incentivize provers
-- numP: number of proof systems
+- `teamC`: amount the team can afford
+- `minReward`: minimum reward to incentivize provers
+- `numP`: number of proof systems
 
 ## Parameters
 
 There are a number of parameters that can be set by the team. These are the levers to pull in this system:
-- timeP: time per proposal (ideal: short, for fast withdrawals)
-- timeC: time to challenge proposal (ideal: long enough to be safe)
-- timeProve: time to submit proof (ideal: long enough to give provers time)
-- proofTf: treasury fee % on proven proposals (ideal: minimal as possible)
-- rejectTf: treasury fee % on invalid proposals (ideal: minimal as possible)
-- timeEP: time for emergency pause (ideal: short, so that emergency pause isn't too harmful if used)
+- `timeP`: time per proposal (ideal: short, for fast withdrawals)
+- `timeC`: time to challenge proposal (ideal: long enough to be safe)
+- `timeProve`: time to submit proof (ideal: long enough to give provers time)
+- `proofTf`: treasury fee % on proven proposals (ideal: minimal as possible)
+- `rejectTf`: treasury fee % on invalid proposals (ideal: minimal as possible)
+- `timeEP`: time for emergency pause (ideal: short, so that emergency pause isn't too harmful if used)
 
 These will end up outputting some objectively optimal values:
-1) bondC: challengeBond (set to minimum that will incentivize provers)
-2) thresholdEP: emergency pause threshold (set to maximum that the team can afford)
-3) bondP: proposalBond (set to minimum that will provide DOS protection on par with challengeBond)
+1) `bondC`: challengeBond (set to minimum that will incentivize provers)
+2) `thresholdEP`: emergency pause threshold (set to maximum that the team can afford)
+3) `bondP`: proposalBond (set to minimum that will provide DOS protection on par with challengeBond)
 
 Specifically, the following constraints will set these optimal values:
 ```
