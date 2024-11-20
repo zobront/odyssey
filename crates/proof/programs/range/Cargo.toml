@@ -28,6 +28,7 @@ kona-primitives.workspace = true
 kona-executor.workspace = true
 kona-client.workspace = true
 kona-derive.workspace = true
+kona-preimage.workspace = true
 
 # op-succinct
 op-succinct-client-utils.workspace = true

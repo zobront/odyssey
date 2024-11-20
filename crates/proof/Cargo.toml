@@ -42,17 +42,17 @@ tracing-subscriber = { version = "0.3.18", features = ["fmt"] }
 
 # kona
 # Note: Switch to latest version of kona once the std::process::Command issue is resolved.
-kona-common = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona" }
-kona-common-proc = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona" }
-kona-preimage = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona", features = [
+kona-common = { git = "https://github.com/zobront/kona", branch = "old-sp1" }
+kona-common-proc = { git = "https://github.com/zobront/kona", branch = "old-sp1" }
+kona-preimage = { git = "https://github.com/zobront/kona", branch = "old-sp1", features = [
     "rkyv",
 ] }
-kona-primitives = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona" }
-kona-mpt = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona" }
-kona-derive = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona", default-features = false }
-kona-executor = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona" }
-kona-client = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona" }
-kona-host = { git = "https://github.com/moongate-forks/kona", branch = "patch-10-17-kona" }
+kona-primitives = { git = "https://github.com/zobront/kona", branch = "old-sp1" }
+kona-mpt = { git = "https://github.com/zobront/kona", branch = "old-sp1" }
+kona-derive = { git = "https://github.com/zobront/kona", branch = "old-sp1", default-features = false }
+kona-executor = { git = "https://github.com/zobront/kona", branch = "old-sp1" }
+kona-client = { git = "https://github.com/zobront/kona", branch = "old-sp1" }
+kona-host = { git = "https://github.com/zobront/kona", branch = "old-sp1" }
 
 # op-succinct
 op-succinct-prove = { path = "scripts/prove" }

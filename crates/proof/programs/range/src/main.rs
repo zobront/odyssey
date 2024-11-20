@@ -26,6 +26,7 @@ use op_succinct_client_utils::{
     driver::MultiBlockDerivationDriver, l2_chain_provider::MultiblockOracleL2ChainProvider,
     precompiles::zkvm_handle_register,
 };
+use serde_json;
 
 cfg_if! {
     if #[cfg(target_os = "zkvm")] {
@@ -37,9 +38,9 @@ cfg_if! {
             InMemoryOracle
         };
         use alloc::vec::Vec;
-        use serde_json;
     } else {
-        use kona_client::CachingOracle;
+        use kona_client::{CachingOracle, HintType};
+        use kona_preimage::HintWriterClient;
         use op_succinct_client_utils::pipes::{ORACLE_READER, HINT_WRITER};
     }
 }
@@ -143,6 +144,18 @@ fn main() {
         let mut l2_block_info;
         let mut new_block_header;
         'step: loop {
+            // Preload the KV store with all execution pairs based on a bulk call to `debug_executePayload`.
+            // - Transform the `attributes` into `OpPayloadAttributes`
+            // TODO
+
+            // - Pass a hint directly to the oracle for L2ExecutePayloadProof(parentHash, attributes)
+            let payload_bytes = serde_json::to_vec(&payload.attributes).unwrap();
+            let hint_data = [payload.parent.block_info.hash.to_vec(), payload_bytes].concat();
+            oracle.write(&HintType::L2ExecutePayloadProof.encode_with(&[&hint_data])).await.unwrap();
+
+            // - Call `get()` on the oracle with a value we know is already in the DB (*kind of a hack, is there better option?*)
+            // TODO
+
             // Execute the payload to generate a new block header.
             info!(
                 "Executing Payload for L2 Block: {}",
