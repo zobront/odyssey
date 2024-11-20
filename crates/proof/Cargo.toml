@@ -72,6 +72,7 @@ alloy-rlp = { version = "0.3.8", default-features = false }
 alloy-eips = { version = "0.4.2", default-features = false }
 revm = { version = "14.0", default-features = false, features = ["kzg-rs"] }
 alloy-consensus = { version = "0.4.2", default-features = false }
+alloy-rpc-types = { version = "0.4.2", features = ["engine"] }
 alloy-sol-types = { version = "0.8" }
 
 # OP Alloy

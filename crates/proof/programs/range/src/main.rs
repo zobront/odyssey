@@ -17,10 +17,13 @@ use alloy_eips::eip2718::Decodable2718;
 use cfg_if::cfg_if;
 use kona_client::{
     l1::{OracleBlobProvider, OracleL1ChainProvider},
-    BootInfo,
+    BootInfo, boot
 };
 use kona_executor::StatelessL2BlockExecutor;
 use log::info;
+use op_alloy_rpc_types_engine::OpPayloadAttributes;
+use alloy::primitives::{Address, B256};
+use alloy_rpc_types::engine::PayloadAttributes;
 use op_alloy_consensus::{OpBlock, OpTxEnvelope};
 use op_succinct_client_utils::{
     driver::MultiBlockDerivationDriver, l2_chain_provider::MultiblockOracleL2ChainProvider,
@@ -40,7 +43,7 @@ cfg_if! {
         use alloc::vec::Vec;
     } else {
         use kona_client::{CachingOracle, HintType};
-        use kona_preimage::HintWriterClient;
+        use kona_preimage::{HintWriterClient, PreimageOracleClient, PreimageKey, PreimageKeyType};
         use op_succinct_client_utils::pipes::{ORACLE_READER, HINT_WRITER};
     }
 }
@@ -146,7 +149,19 @@ fn main() {
         'step: loop {
             // Preload the KV store with all execution pairs based on a bulk call to `debug_executePayload`.
             // - Transform the `attributes` into `OpPayloadAttributes`
-            // TODO
+            let op_payload_attrs = OpPayloadAttributes {
+                gas_limit: None,
+                eip_1559_params: None,
+                transactions: None,
+                no_tx_pool: None,
+                payload_attributes: PayloadAttributes {
+                    timestamp: 0,
+                    prev_randao: B256::ZERO,
+                    suggested_fee_recipient: Address::ZERO,
+                    withdrawals: None,
+                    parent_beacon_block_root: None,
+                }
+            };
 
             // - Pass a hint directly to the oracle for L2ExecutePayloadProof(parentHash, attributes)
             let payload_bytes = serde_json::to_vec(&payload.attributes).unwrap();
@@ -154,7 +169,7 @@ fn main() {
             oracle.write(&HintType::L2ExecutePayloadProof.encode_with(&[&hint_data])).await.unwrap();
 
             // - Call `get()` on the oracle with a value we know is already in the DB (*kind of a hack, is there better option?*)
-            // TODO
+            oracle.get(PreimageKey::new_local(boot::L1_HEAD_KEY.to())).await.unwrap();
 
             // Execute the payload to generate a new block header.
             info!(
