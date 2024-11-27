@@ -4,7 +4,8 @@ members = [
     "crates/node",
     "crates/e2e-tests",
     "crates/wallet",
-    "crates/walltime", "crates/proof",
+    "crates/walltime",
+    "crates/proof"
 ]
 default-members = ["bin/odyssey/"]
 resolver = "2"

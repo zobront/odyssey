@@ -5099,7 +5099,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "proofs"
+name = "proof"
 version = "0.0.0"
 
 [[package]]
