@@ -13,6 +13,8 @@ interface IMultiproofOracle {
         address treasury;
         uint16 emergencyPauseThreshold;
         uint40 emergencyPauseTime;
+        bytes32 rollupConfigHash;
+        bytes32 vkey;
     }
 
     struct Challenge {
@@ -39,9 +41,13 @@ interface IMultiproofOracle {
         uint96 blockNum;
     }
 
-    struct ProofData {
-        bytes publicValues;
-        bytes proof;
+    struct PublicValuesStruct {
+        bytes32 l1BlockHash;
+        bytes32 l2PreRoot;
+        bytes32 claimRoot;
+        uint256 l2BlockNum;
+        bytes32 rollupConfigHash;
+        bytes32 vkey;
     }
 
     struct PauseData {
