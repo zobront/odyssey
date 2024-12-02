@@ -4,7 +4,7 @@ members = [
     "crates/node",
     "crates/e2e-tests",
     "crates/wallet",
-    "crates/walltime",
+    "crates/walltime", "crates/sgx",
 ]
 default-members = ["bin/odyssey/"]
 resolver = "2"
@@ -29,8 +29,8 @@ rust.missing_docs = "warn"
 rust.rust_2018_idioms = { level = "deny", priority = -1 }
 rust.unreachable_pub = "warn"
 rust.unused_must_use = "deny"
-rustdoc.all = "warn"
 rust.unnameable-types = "warn"
+rustdoc.all = "warn"
 
 [workspace.lints.clippy]
 # These are some of clippy's nursery (i.e., experimental) lints that we like.
