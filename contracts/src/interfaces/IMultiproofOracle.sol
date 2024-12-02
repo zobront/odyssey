@@ -47,4 +47,9 @@ interface IMultiproofOracle {
         uint40 deadline;
         Challenge[] challenges;
     }
+
+    /// Getters
+
+    function getProposal(bytes32 outputRoot, uint256 index) external view returns (ProposalData memory);
+    function isValidProposal(bytes32 outputRoot, uint256 index) external view returns (bool);
 }
