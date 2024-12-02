@@ -55,12 +55,19 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
     /// @notice Allows for interactions with non standard ERC20 tokens.
     using SafeERC20 for IERC20;
 
+    /// @notice Represents a proven withdrawal.
+    /// @custom:field outputRoot      Output root that the withdrawal is being proven against.
+    /// @custom:field index           Index of the output root proposal in the MultiproofOracle contract.
+    /// @custom:field timestamp       Timestamp at whcih the withdrawal was proven.
+    struct ProvenWithdrawal {
+        bytes32 outputRoot;
+        uint192 index;
+        uint64 timestamp;
+    }
+
+
     /// @notice The delay between when a withdrawal transaction is proven and when it may be finalized.
     uint256 internal immutable PROOF_MATURITY_DELAY_SECONDS;
-
-    /// @notice The delay between when a dispute game is resolved and when a withdrawal proven against it may be
-    ///         finalized.
-    uint256 internal immutable DISPUTE_GAME_FINALITY_DELAY_SECONDS;
 
     /// @notice Version of the deposit event.
     uint256 internal constant DEPOSIT_VERSION = 0;
@@ -187,9 +194,8 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
     }
 
     /// @notice Constructs the OptimismPortal contract.
-    constructor(uint256 _proofMaturityDelaySeconds, uint256 _disputeGameFinalityDelaySeconds) {
+    constructor(uint256 _proofMaturityDelaySeconds) {
         PROOF_MATURITY_DELAY_SECONDS = _proofMaturityDelaySeconds;
-        DISPUTE_GAME_FINALITY_DELAY_SECONDS = _disputeGameFinalityDelaySeconds;
 
         initialize({
             _disputeGameFactory: IDisputeGameFactory(address(0)),
@@ -302,12 +308,12 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
 
     /// @notice Proves a withdrawal transaction.
     /// @param _tx               Withdrawal transaction to finalize.
-    /// @param _disputeGameIndex Index of the dispute game to prove the withdrawal against.
+    /// @param _proposalIndex    Index of the proposal to prove the withdrawal against.
     /// @param _outputRootProof  Inclusion proof of the L2ToL1MessagePasser contract's storage root.
     /// @param _withdrawalProof  Inclusion proof of the withdrawal in L2ToL1MessagePasser contract.
     function proveWithdrawalTransaction(
         Types.WithdrawalTransaction memory _tx,
-        uint256 _disputeGameIndex,
+        uint256 _proposalIndex,
         Types.OutputRootProof calldata _outputRootProof,
         bytes[] calldata _withdrawalProof
     )
@@ -320,18 +326,15 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         if (_tx.target == address(this)) revert BadTarget();
 
         // Fetch the dispute game proxy from the `DisputeGameFactory` contract.
-        (GameType gameType,, IDisputeGame gameProxy) = disputeGameFactory.gameAtIndex(_disputeGameIndex);
-        Claim outputRoot = gameProxy.rootClaim();
+        bytes32 outputRoot = Hashing.hashOutputRootProof(_outputRootProof);
+        ProposalData memory proposalData = multiproofOracle.proposals(outputRoot, _proposalIndex);
 
-        // Verify that the output root can be generated with the elements in the proof.
-        if (outputRoot.raw() != Hashing.hashOutputRootProof(_outputRootProof)) revert InvalidProof();
-
-        // Load the ProvenWithdrawal into memory, using the withdrawal hash as a unique identifier.
+        // Load the withdrawal hash into memory, using the withdrawal hash as a unique identifier.
         bytes32 withdrawalHash = Hashing.hashWithdrawal(_tx);
 
         // We do not allow for proving withdrawals against dispute games that have resolved against the favor
         // of the root claim.
-        if (gameProxy.status() == GameStatus.CHALLENGER_WINS) revert InvalidDisputeGame();
+        if (proposalData.state == ProposalState.Rejected) revert InvalidDisputeGame();
 
         // Compute the storage slot of the withdrawal hash in the L2ToL1MessagePasser contract.
         // Refer to the Solidity documentation for more information on how storage layouts are
@@ -359,8 +362,11 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         // Designate the withdrawalHash as proven by storing the `disputeGameProxy` & `timestamp` in the
         // `provenWithdrawals` mapping. A `withdrawalHash` can only be proven once unless the dispute game it proved
         // against resolves against the favor of the root claim.
-        provenWithdrawals[withdrawalHash][msg.sender] =
-            ProvenWithdrawal({ disputeGameProxy: gameProxy, timestamp: uint64(block.timestamp) });
+        provenWithdrawals[withdrawalHash][msg.sender] = ProvenWithdrawal({
+            outputRoot: outputRoot,
+            index: _proposalIndex,
+            timestamp: uint64(block.timestamp)
+        });
 
         // Emit a `WithdrawalProven` event.
         emit WithdrawalProven(withdrawalHash, _tx.sender, _tx.target);
@@ -642,25 +648,11 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
     /// @param _proofSubmitter The submitter of the proof for the withdrawal hash
     function checkWithdrawal(bytes32 _withdrawalHash, address _proofSubmitter) public view {
         ProvenWithdrawal memory provenWithdrawal = provenWithdrawals[_withdrawalHash][_proofSubmitter];
-        IDisputeGame disputeGameProxy = provenWithdrawal.disputeGameProxy;
-
-        // The dispute game must not be blacklisted.
-        if (disputeGameBlacklist[disputeGameProxy]) revert Blacklisted();
 
         // A withdrawal can only be finalized if it has been proven. We know that a withdrawal has
         // been proven at least once when its timestamp is non-zero. Unproven withdrawals will have
         // a timestamp of zero.
         if (provenWithdrawal.timestamp == 0) revert Unproven();
-
-        uint64 createdAt = disputeGameProxy.createdAt().raw();
-
-        // As a sanity check, we make sure that the proven withdrawal's timestamp is greater than
-        // starting timestamp inside the Dispute Game. Not strictly necessary but extra layer of
-        // safety against weird bugs in the proving step.
-        require(
-            provenWithdrawal.timestamp > createdAt,
-            "OptimismPortal: withdrawal timestamp less than dispute game creation timestamp"
-        );
 
         // A proven withdrawal must wait at least `PROOF_MATURITY_DELAY_SECONDS` before finalizing.
         require(
@@ -671,26 +663,9 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         // A proven withdrawal must wait until the dispute game it was proven against has been
         // resolved in favor of the root claim (the output proposal). This is to prevent users
         // from finalizing withdrawals proven against non-finalized output roots.
-        if (disputeGameProxy.status() != GameStatus.DEFENDER_WINS) revert ProposalNotValidated();
-
-        // The game type of the dispute game must be the respected game type. This was also checked in
-        // `proveWithdrawalTransaction`, but we check it again in case the respected game type has changed since
-        // the withdrawal was proven.
-        if (disputeGameProxy.gameType().raw() != respectedGameType.raw()) revert InvalidGameType();
-
-        // The game must have been created after `respectedGameTypeUpdatedAt`. This is to prevent users from creating
-        // invalid disputes against a deployed game type while the off-chain challenge agents are not watching.
         require(
-            createdAt >= respectedGameTypeUpdatedAt,
-            "OptimismPortal: dispute game created before respected game type was updated"
-        );
-
-        // Before a withdrawal can be finalized, the dispute game it was proven against must have been
-        // resolved for at least `DISPUTE_GAME_FINALITY_DELAY_SECONDS`. This is to allow for manual
-        // intervention in the event that a dispute game is resolved incorrectly.
-        require(
-            block.timestamp - disputeGameProxy.resolvedAt().raw() > DISPUTE_GAME_FINALITY_DELAY_SECONDS,
-            "OptimismPortal: output proposal in air-gap"
+            multiproofOracle.isValidProposal(provenWithdrawal.outputRoot, provenWithdrawal.index),
+            "OptimismPortal: output root has not been confirmed"
         );
 
         // Check that this withdrawal has not already been finalized, this is replay protection.
