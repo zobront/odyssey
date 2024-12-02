@@ -75,8 +75,8 @@ contract MultiproofOracleTest is Test {
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(proposedOutputRoot, 0);
 
-        (,,,, IMultiproofOracle.ProposalState proposalState,,,) = oracle.proposals(proposedOutputRoot, 0);
-        assertEq(uint8(proposalState), uint8(IMultiproofOracle.ProposalState.Rejected));
+        IMultiproofOracle.ProposalData memory proposalData = oracle.getProposal(proposedOutputRoot, 0);
+        assertEq(uint8(proposalData.state), uint8(IMultiproofOracle.ProposalState.Rejected));
         assert(!oracle.emergencyShutdown());
     }
 
@@ -92,8 +92,8 @@ contract MultiproofOracleTest is Test {
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(proposedOutputRoot, 0);
 
-        (,,,, IMultiproofOracle.ProposalState proposalState,,,) = oracle.proposals(proposedOutputRoot, 0);
-        assertEq(uint8(proposalState), uint8(IMultiproofOracle.ProposalState.Rejected));
+        IMultiproofOracle.ProposalData memory proposalData = oracle.getProposal(proposedOutputRoot, 0);
+        assertEq(uint8(proposalData.state), uint8(IMultiproofOracle.ProposalState.Rejected));
         assert(!oracle.emergencyShutdown());
     }
 
@@ -109,8 +109,8 @@ contract MultiproofOracleTest is Test {
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(proposedOutputRoot, 0);
 
-        (,,,, IMultiproofOracle.ProposalState proposalState,,,) = oracle.proposals(proposedOutputRoot, 0);
-        assertEq(uint8(proposalState), uint8(IMultiproofOracle.ProposalState.Rejected));
+        IMultiproofOracle.ProposalData memory proposalData = oracle.getProposal(proposedOutputRoot, 0);
+        assertEq(uint8(proposalData.state), uint8(IMultiproofOracle.ProposalState.Rejected));
         assert(oracle.emergencyShutdown());
     }
 
@@ -126,8 +126,8 @@ contract MultiproofOracleTest is Test {
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(proposedOutputRoot, 0);
 
-        (,,,, IMultiproofOracle.ProposalState proposalState,,,) = oracle.proposals(proposedOutputRoot, 0);
-        assertEq(uint8(proposalState), uint8(IMultiproofOracle.ProposalState.Confirmed));
+        IMultiproofOracle.ProposalData memory proposalData = oracle.getProposal(proposedOutputRoot, 0);
+        assertEq(uint8(proposalData.state), uint8(IMultiproofOracle.ProposalState.Confirmed));
         assert(!oracle.emergencyShutdown());
     }
 
@@ -147,11 +147,11 @@ contract MultiproofOracleTest is Test {
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(newOutputRoot, 0);
 
-        (,,,, IMultiproofOracle.ProposalState proposalState,,,) = oracle.proposals(proposedOutputRoot, 0);
-        assertEq(uint8(proposalState), uint8(IMultiproofOracle.ProposalState.Rejected));
+        IMultiproofOracle.ProposalData memory proposalData = oracle.getProposal(proposedOutputRoot, 0);
+        assertEq(uint8(proposalData.state), uint8(IMultiproofOracle.ProposalState.Rejected));
 
-        (,,,, proposalState,,,) = oracle.proposals(newOutputRoot, 0);
-        assertEq(uint8(proposalState), uint8(IMultiproofOracle.ProposalState.Rejected));
+        proposalData = oracle.getProposal(newOutputRoot, 0);
+        assertEq(uint8(proposalData.state), uint8(IMultiproofOracle.ProposalState.Rejected));
     }
 
     // propose 200+, challenge 200+, emergency pause

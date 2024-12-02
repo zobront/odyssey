@@ -18,7 +18,8 @@ contract MultiproofOracle is IMultiproofOracle {
     uint256 public immutable proofReward; // to challenge, we must bond `proofReward * provers.length`
     uint256 public immutable provingTime;
 
-    mapping(bytes32 outputRoot => ProposalData[]) public proposals;
+    // outputRoot => array of proposals
+    mapping(bytes32 => ProposalData[]) proposals;
     IProver[] public provers;
 
     // TODO: Split into separate fees for proof and challenge, if necessary.
@@ -115,7 +116,7 @@ contract MultiproofOracle is IMultiproofOracle {
                 continue;
             }
 
-            // figure out simplest way to check this given that we want to stay bytes for flexibility across proof systems
+            // TODO: figure out simplest way to check this given that we want to stay bytes for flexibility across proof systems
             // - require parent output root & blocknum match public values
             // - require proposal blocknum matches public values
 
@@ -231,7 +232,7 @@ contract MultiproofOracle is IMultiproofOracle {
         delete emergencyPauseChallenges;
     }
 
-    // TODO: Can deploy contract with an incentive for calling this, if we want.
+    // TODO: Can deploy this contract with funds as an incentive for calling this, if we want.
     function triggerEmergencyShutdown(bytes32 outputRoot1, uint index1, bytes32 outputRoot2, uint index2) external {
         require(isValidProposal(outputRoot1, index1), "invalid proposal 1");
         require(isValidProposal(outputRoot2, index2), "invalid proposal 2");
@@ -244,6 +245,10 @@ contract MultiproofOracle is IMultiproofOracle {
     //////////// VIEWS ////////////
     ///////////////////////////////
 
+    function getProposal(bytes32 outputRoot, uint256 index) public view returns (ProposalData memory) {
+        return proposals[outputRoot][index];
+    }
+
     function isFinalized(ProposalState state) public pure returns (bool) {
         require(state != ProposalState.None, "proposal doesn't exist");
         return state == ProposalState.Confirmed || state == ProposalState.Rejected;
@@ -252,6 +257,7 @@ contract MultiproofOracle is IMultiproofOracle {
     // This can be called on chain to check if a block number and output root have been confirmed.
     // TODO: Do some gas testing to see the max length of proposals that can be checked
     // without running out of gas. We probably wouldn't want to use this anywhere mission critical.
+    // If it's important to have, we can just save outputRoot = true in separate mapping for this.
     function isValidProposal(bytes32 outputRoot) public view returns (bool) {
         uint proposalsLength = proposals[outputRoot].length;
         for (uint i = 0; i < proposalsLength; i++) {

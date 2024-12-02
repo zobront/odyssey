@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 // Contracts
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import { ResourceMetering } from "src/L1/ResourceMetering.sol";
+import { ResourceMetering } from "@optimism/src/L1/ResourceMetering.sol";
 
 // Libraries
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { SafeCall } from "src/libraries/SafeCall.sol";
-import { Constants } from "src/libraries/Constants.sol";
-import { Types } from "src/libraries/Types.sol";
-import { Hashing } from "src/libraries/Hashing.sol";
-import { SecureMerkleTrie } from "src/libraries/trie/SecureMerkleTrie.sol";
-import { Predeploys } from "src/libraries/Predeploys.sol";
-import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
+import { SafeCall } from "@optimism/src/libraries/SafeCall.sol";
+import { Constants } from "@optimism/src/libraries/Constants.sol";
+import { Types } from "@optimism/src/libraries/Types.sol";
+import { Hashing } from "@optimism/src/libraries/Hashing.sol";
+import { SecureMerkleTrie } from "@optimism/src/libraries/trie/SecureMerkleTrie.sol";
+import { Predeploys } from "@optimism/src/libraries/Predeploys.sol";
+import { AddressAliasHelper } from "@optimism/src/vendor/AddressAliasHelper.sol";
 import {
     BadTarget,
     LargeCalldata,
@@ -33,18 +33,19 @@ import {
     Unproven,
     ProposalNotValidated,
     AlreadyFinalized
-} from "src/libraries/PortalErrors.sol";
-import { GameStatus, GameType, Claim, Timestamp, Hash } from "src/dispute/lib/Types.sol";
+} from "@optimism/src/libraries/PortalErrors.sol";
+import { GameStatus, GameType, Claim, Timestamp, Hash } from "@optimism/src/dispute/lib/Types.sol";
+import { IMultiproofOracle } from "src/interfaces/IMultiproofOracle.sol";
 
 // Interfaces
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ISemver } from "src/universal/interfaces/ISemver.sol";
-import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
-import { IResourceMetering } from "src/L1/interfaces/IResourceMetering.sol";
-import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
-import { IDisputeGameFactory } from "src/dispute/interfaces/IDisputeGameFactory.sol";
-import { IDisputeGame } from "src/dispute/interfaces/IDisputeGame.sol";
-import { IL1Block } from "src/L2/interfaces/IL1Block.sol";
+import { ISemver } from "@optimism/src/universal/interfaces/ISemver.sol";
+import { ISystemConfig } from "@optimism/src/L1/interfaces/ISystemConfig.sol";
+import { IResourceMetering } from "@optimism/src/L1/interfaces/IResourceMetering.sol";
+import { ISuperchainConfig } from "@optimism/src/L1/interfaces/ISuperchainConfig.sol";
+import { IDisputeGameFactory } from "@optimism/src/dispute/interfaces/IDisputeGameFactory.sol";
+import { IDisputeGame } from "@optimism/src/dispute/interfaces/IDisputeGame.sol";
+import { IL1Block } from "@optimism/src/L2/interfaces/IL1Block.sol";
 
 /// @custom:proxied true
 /// @title OptimismPortal3
@@ -198,7 +199,7 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         PROOF_MATURITY_DELAY_SECONDS = _proofMaturityDelaySeconds;
 
         initialize({
-            _disputeGameFactory: IDisputeGameFactory(address(0)),
+            _multiproofOracle: IMultiproofOracle(address(0)),
             _systemConfig: ISystemConfig(address(0)),
             _superchainConfig: ISuperchainConfig(address(0)),
             _initialRespectedGameType: GameType.wrap(0)
@@ -206,7 +207,7 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
     }
 
     /// @notice Initializer.
-    /// @param _disputeGameFactory Contract of the DisputeGameFactory.
+    /// @param _multiproofOracle Contract of the MultiproofOracle.
     /// @param _systemConfig Contract of the SystemConfig.
     /// @param _superchainConfig Contract of the SuperchainConfig.
     function initialize(
@@ -260,8 +261,9 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
     }
 
     /// @notice Getter for the dispute game finality delay.
+    /// Hardcoded to 0, as this parameter isn't required in Stage 2.
     function disputeGameFinalityDelaySeconds() public view returns (uint256) {
-        return DISPUTE_GAME_FINALITY_DELAY_SECONDS;
+        return 0;
     }
 
     /// @notice Computes the minimum gas limit for a deposit.
@@ -327,14 +329,14 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
 
         // Fetch the dispute game proxy from the `DisputeGameFactory` contract.
         bytes32 outputRoot = Hashing.hashOutputRootProof(_outputRootProof);
-        ProposalData memory proposalData = multiproofOracle.proposals(outputRoot, _proposalIndex);
+        IMultiproofOracle.ProposalData memory proposalData = multiproofOracle.getProposal(outputRoot, _proposalIndex);
 
         // Load the withdrawal hash into memory, using the withdrawal hash as a unique identifier.
         bytes32 withdrawalHash = Hashing.hashWithdrawal(_tx);
 
         // We do not allow for proving withdrawals against dispute games that have resolved against the favor
         // of the root claim.
-        if (proposalData.state == ProposalState.Rejected) revert InvalidDisputeGame();
+        if (proposalData.state == IMultiproofOracle.ProposalState.Rejected) revert InvalidDisputeGame();
 
         // Compute the storage slot of the withdrawal hash in the L2ToL1MessagePasser contract.
         // Refer to the Solidity documentation for more information on how storage layouts are
@@ -364,7 +366,7 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         // against resolves against the favor of the root claim.
         provenWithdrawals[withdrawalHash][msg.sender] = ProvenWithdrawal({
             outputRoot: outputRoot,
-            index: _proposalIndex,
+            index: uint192(_proposalIndex), // TODO: use safecast for safety, even though could never get that high
             timestamp: uint64(block.timestamp)
         });
 
@@ -622,24 +624,6 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
                 abi.encodeCall(IL1Block.setGasPayingToken, (_token, _decimals, _name, _symbol))
             )
         );
-    }
-
-    /// @notice Blacklists a dispute game. Should only be used in the event that a dispute game resolves incorrectly.
-    /// @param _disputeGame Dispute game to blacklist.
-    function blacklistDisputeGame(IDisputeGame _disputeGame) external {
-        if (msg.sender != guardian()) revert Unauthorized();
-        disputeGameBlacklist[_disputeGame] = true;
-        emit DisputeGameBlacklisted(_disputeGame);
-    }
-
-    /// @notice Sets the respected game type. Changing this value can alter the security properties of the system,
-    ///         depending on the new game's behavior.
-    /// @param _gameType The game type to consult for output proposals.
-    function setRespectedGameType(GameType _gameType) external {
-        if (msg.sender != guardian()) revert Unauthorized();
-        respectedGameType = _gameType;
-        respectedGameTypeUpdatedAt = uint64(block.timestamp);
-        emit RespectedGameTypeSet(_gameType, Timestamp.wrap(respectedGameTypeUpdatedAt));
     }
 
     /// @notice Checks if a withdrawal can be finalized. This function will revert if the withdrawal cannot be
