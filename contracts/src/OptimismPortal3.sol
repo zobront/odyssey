@@ -9,8 +9,7 @@ import { ResourceMetering } from "@optimism/src/L1/ResourceMetering.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { SafeCall } from "@optimism/src/libraries/SafeCall.sol";
 import { Constants } from "@optimism/src/libraries/Constants.sol";
-import { Types } from "@optimism/src/libraries/Types.sol";
-import { Hashing } from "@optimism/src/libraries/Hashing.sol";
+import { Types, Hashing } from "@optimism/src/libraries/Hashing.sol";
 import { SecureMerkleTrie } from "@optimism/src/libraries/trie/SecureMerkleTrie.sol";
 import { Predeploys } from "@optimism/src/libraries/Predeploys.sol";
 import { AddressAliasHelper } from "@optimism/src/vendor/AddressAliasHelper.sol";
@@ -40,8 +39,7 @@ import { IMultiproofOracle } from "src/interfaces/IMultiproofOracle.sol";
 // Interfaces
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ISemver } from "@optimism/src/universal/interfaces/ISemver.sol";
-import { ISystemConfig } from "@optimism/src/L1/interfaces/ISystemConfig.sol";
-import { IResourceMetering } from "@optimism/src/L1/interfaces/IResourceMetering.sol";
+import { IResourceMetering, ISystemConfig } from "@optimism/src/L1/interfaces/ISystemConfig.sol";
 import { ISuperchainConfig } from "@optimism/src/L1/interfaces/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "@optimism/src/dispute/interfaces/IDisputeGameFactory.sol";
 import { IDisputeGame } from "@optimism/src/dispute/interfaces/IDisputeGame.sol";
@@ -69,6 +67,10 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
 
     /// @notice The delay between when a withdrawal transaction is proven and when it may be finalized.
     uint256 internal immutable PROOF_MATURITY_DELAY_SECONDS;
+
+    /// @notice The delay between when a dispute game is resolved and when a withdrawal proven against it may be
+    ///         finalized.
+    uint256 internal constant DISPUTE_GAME_FINALITY_DELAY_SECONDS = 0;
 
     /// @notice Version of the deposit event.
     uint256 internal constant DEPOSIT_VERSION = 0;
@@ -201,8 +203,7 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         initialize({
             _multiproofOracle: IMultiproofOracle(address(0)),
             _systemConfig: ISystemConfig(address(0)),
-            _superchainConfig: ISuperchainConfig(address(0)),
-            _initialRespectedGameType: GameType.wrap(0)
+            _superchainConfig: ISuperchainConfig(address(0))
         });
     }
 
@@ -213,8 +214,7 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
     function initialize(
         IMultiproofOracle _multiproofOracle,
         ISystemConfig _systemConfig,
-        ISuperchainConfig _superchainConfig,
-        GameType _initialRespectedGameType
+        ISuperchainConfig _superchainConfig
     )
         public
         initializer
@@ -261,9 +261,8 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
     }
 
     /// @notice Getter for the dispute game finality delay.
-    /// Hardcoded to 0, as this parameter isn't required in Stage 2.
-    function disputeGameFinalityDelaySeconds() public view returns (uint256) {
-        return 0;
+    function disputeGameFinalityDelaySeconds() public pure returns (uint256) {
+        return DISPUTE_GAME_FINALITY_DELAY_SECONDS;
     }
 
     /// @notice Computes the minimum gas limit for a deposit.
