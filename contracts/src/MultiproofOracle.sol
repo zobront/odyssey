@@ -291,19 +291,6 @@ contract MultiproofOracle is IMultiproofOracle {
         return state == ProposalState.Confirmed || state == ProposalState.Rejected;
     }
 
-    // This can be called on chain to check if a block number and output root have been confirmed.
-    // TODO: Do some gas testing to see the max length of proposals that can be checked
-    // without running out of gas. We probably wouldn't want to use this anywhere mission critical.
-    // If it's important to have, we can just save outputRoot = true in separate mapping for this.
-    function isValidProposal(bytes32 outputRoot) public view returns (bool) {
-        uint proposalsLength = proposals[outputRoot].length;
-        for (uint i = 0; i < proposalsLength; i++) {
-            if (isValidProposal(outputRoot, i)) return true;
-        }
-
-        return false;
-    }
-
     function isValidProposal(bytes32 outputRoot, uint256 index) public view returns (bool) {
         require(!emergencyShutdown, "emergency shutdown");
         return proposals[outputRoot][index].state == ProposalState.Confirmed;
