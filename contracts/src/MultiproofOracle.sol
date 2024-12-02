@@ -18,6 +18,9 @@ contract MultiproofOracle is IMultiproofOracle {
     uint256 public immutable proofReward; // to challenge, we must bond `proofReward * provers.length`
     uint256 public immutable provingTime;
 
+    bytes32 public immutable rollupConfigHash;
+    bytes32 public immutable vkey;
+
     // outputRoot => array of proposals
     mapping(bytes32 => ProposalData[]) proposals;
     IProver[] public provers;
@@ -33,12 +36,15 @@ contract MultiproofOracle is IMultiproofOracle {
     Challenge[] emergencyPauseChallenges;
 
     bool public emergencyShutdown;
+    uint256 emergencyShutdownIncentive;
+
+    mapping(bytes32 => bool) public historicBlockhashes;
 
     ///////////////////////////////
     ///////// CONSTRUCTOR /////////
     ///////////////////////////////
 
-    constructor(IProver[] memory _provers, uint96 _initialBlockNum, bytes32 _initialOutputRoot, ImmutableArgs memory _args) {
+    constructor(IProver[] memory _provers, uint96 _initialBlockNum, bytes32 _initialOutputRoot, ImmutableArgs memory _args) payable {
         require(_provers.length < 40); // proven bitmap has to fit in uint40
         provers = _provers;
 
@@ -54,6 +60,8 @@ contract MultiproofOracle is IMultiproofOracle {
         treasury = _args.treasury;
         emergencyPauseThreshold = _args.emergencyPauseThreshold;
         emergencyPauseTime = _args.emergencyPauseTime;
+        rollupConfigHash = _args.rollupConfigHash;
+        vkey = _args.vkey;
 
         // initialize anchor state with Confirmed status
         proposals[_initialOutputRoot].push(ProposalData({
@@ -69,6 +77,8 @@ contract MultiproofOracle is IMultiproofOracle {
             challenger: address(0),
             blockNum: _initialBlockNum
         }));
+
+        emergencyShutdownIncentive = msg.value;
     }
 
     ///////////////////////////////
@@ -104,25 +114,37 @@ contract MultiproofOracle is IMultiproofOracle {
         proposals[outputRoot][index].challenger = msg.sender;
     }
 
-    function prove(bytes32 outputRoot, uint256 index, ProofData[] memory proofs) public {
+    function prove(bytes32 outputRoot, uint256 index, bytes32 l1BlockHash, bytes[] memory proofs) public {
         require(!emergencyShutdown, "emergency shutdown");
         ProposalData storage proposal = proposals[outputRoot][index];
         require(proposal.state == ProposalState.Challenged, "can only prove challenged proposals");
         require(proposal.deadline > block.timestamp, "deadline passed");
+        require(historicBlockhashes[l1BlockHash], "blockhash not checkpointed");
 
         // verify ZK proofs
         require(proofs.length == provers.length, "incorrect number of proofs");
+
         uint successfulProofCount;
         for (uint256 i = 0; i < proofs.length; i++) {
             if (proposal.provenBitmap & (1 << i) != 0) {
                 continue;
             }
 
-            // TODO: figure out simplest way to check this given that we want to stay bytes for flexibility across proof systems
-            // - require parent output root & blocknum match public values
-            // - require proposal blocknum matches public values
+            // TODO: We will need to support different public values for each proof type
+            // This probably means different vks, etc, but need to see how those proof systems work
+            PublicValuesStruct memory pvs = PublicValuesStruct({
+                l1BlockHash: l1BlockHash,
+                l2PreRoot: proposal.parent.outputRoot,
+                claimRoot: outputRoot,
+                l2BlockNum: proposal.blockNum,
+                rollupConfigHash: rollupConfigHash,
+                vkey: vkey
+            });
 
-            if (provers[i].verify(proofs[i].publicValues, proofs[i].proof)) {
+            // Note: It IS possible to verify valid proofs against invalid parents.
+            // Challengers should not challenge proofs of invalid parents, as they will lose their bonds.
+            // As long as the parent is rejected, children will be rejected too.
+            if (provers[i].verify(abi.encode(pvs), proofs[i])) {
                 proposal.provenBitmap |= uint40(1 << i);
                 successfulProofCount++;
             }
@@ -199,11 +221,24 @@ contract MultiproofOracle is IMultiproofOracle {
         // If any proofs were proven, we have an on chain bug and need to shut down to address it.
         if (proposal.provenBitmap != 0) {
             emergencyShutdown = true;
+            payable(msg.sender).transfer(emergencyShutdownIncentive);
         }
     }
 
     ///////////////////////////////
-    /////////// EMERGENCY //////////
+    /////////// HELPERS ///////////
+    ///////////////////////////////
+
+    function checkpointBlockHash(uint256 _blockNumber) external returns (bytes32) {
+        bytes32 blockHash = blockhash(_blockNumber);
+        require(blockHash != bytes32(0), "block hash not available");
+        historicBlockhashes[blockHash] = true;
+
+        return blockHash;
+    }
+
+    ///////////////////////////////
+    /////////// EMERGENCY /////////
     ///////////////////////////////
 
     // This function exists to block a Proof of Whale attack.
@@ -234,13 +269,13 @@ contract MultiproofOracle is IMultiproofOracle {
         delete emergencyPauseChallenges;
     }
 
-    // TODO: Can deploy this contract with funds as an incentive for calling this, if we want.
     function triggerEmergencyShutdown(bytes32 outputRoot1, uint index1, bytes32 outputRoot2, uint index2) external {
         require(isValidProposal(outputRoot1, index1), "invalid proposal 1");
         require(isValidProposal(outputRoot2, index2), "invalid proposal 2");
         require(outputRoot1 != outputRoot2, "output roots must be different");
 
         emergencyShutdown = true;
+        payable(msg.sender).transfer(emergencyShutdownIncentive);
     }
 
     ///////////////////////////////

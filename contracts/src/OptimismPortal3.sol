@@ -7,6 +7,7 @@ import { ResourceMetering } from "@optimism/src/L1/ResourceMetering.sol";
 
 // Libraries
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { SafeCall } from "@optimism/src/libraries/SafeCall.sol";
 import { Constants } from "@optimism/src/libraries/Constants.sol";
 import { Types, Hashing } from "@optimism/src/libraries/Hashing.sol";
@@ -365,7 +366,7 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         // against resolves against the favor of the root claim.
         provenWithdrawals[withdrawalHash][msg.sender] = ProvenWithdrawal({
             outputRoot: outputRoot,
-            index: uint192(_proposalIndex), // TODO: use safecast for safety, even though could never get that high
+            index: SafeCast.toUint192(_proposalIndex),
             timestamp: uint64(block.timestamp)
         });
 

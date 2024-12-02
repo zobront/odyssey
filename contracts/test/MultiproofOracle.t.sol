@@ -30,7 +30,9 @@ contract MultiproofOracleTest is Test {
             challengedFeePctWad: uint64(0.5e18),
             treasury: address(makeAddr("treasury")),
             emergencyPauseThreshold: uint16(200),
-            emergencyPauseTime: uint40(10 days)
+            emergencyPauseTime: uint40(10 days),
+            rollupConfigHash: bytes32(0),
+            vkey: bytes32(0)
         });
         oracle = new MultiproofOracle(provers, 0, bytes32(0), args);
         vm.deal(address(oracle), 100 ether);
@@ -87,8 +89,9 @@ contract MultiproofOracleTest is Test {
         oracle.challenge{value: oracle.proofReward() * 3}(proposedOutputRoot, 0);
 
         // all failed proofs
-        IMultiproofOracle.ProofData[] memory proofs = _generateProofs(false, true);
-        oracle.prove(proposedOutputRoot, 0, proofs);
+        bytes32 l1BlockHash = oracle.checkpointBlockHash(block.number - 1);
+        bytes[] memory proofs = _generateProofs(false, true);
+        oracle.prove(proposedOutputRoot, 0, l1BlockHash, proofs);
 
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(proposedOutputRoot, 0);
@@ -104,8 +107,9 @@ contract MultiproofOracleTest is Test {
         oracle.challenge{value: oracle.proofReward() * 3}(proposedOutputRoot, 0);
 
         // all failed proofs
-        IMultiproofOracle.ProofData[] memory proofs = _generateProofs(false, false);
-        oracle.prove(proposedOutputRoot, 0, proofs);
+        bytes32 l1BlockHash = oracle.checkpointBlockHash(block.number - 1);
+        bytes[] memory proofs = _generateProofs(false, false);
+        oracle.prove(proposedOutputRoot, 0, l1BlockHash, proofs);
 
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(proposedOutputRoot, 0);
@@ -121,8 +125,9 @@ contract MultiproofOracleTest is Test {
         oracle.challenge{value: oracle.proofReward() * 3}(proposedOutputRoot, 0);
 
         // all failed proofs
-        IMultiproofOracle.ProofData[] memory proofs = _generateProofs(true, false);
-        oracle.prove(proposedOutputRoot, 0, proofs);
+        bytes32 l1BlockHash = oracle.checkpointBlockHash(block.number - 1);
+        bytes[] memory proofs = _generateProofs(true, false);
+        oracle.prove(proposedOutputRoot, 0, l1BlockHash, proofs);
 
         vm.warp(block.timestamp + oracle.provingTime() + 1);
         oracle.finalize(proposedOutputRoot, 0);
@@ -191,14 +196,10 @@ contract MultiproofOracleTest is Test {
 
     receive() external payable {}
 
-    function _generateProofs(bool allTrue, bool allFalse) internal pure returns (IMultiproofOracle.ProofData[] memory) {
-        IMultiproofOracle.ProofData[] memory proofs = new IMultiproofOracle.ProofData[](3);
+    function _generateProofs(bool allTrue, bool allFalse) internal pure returns (bytes[] memory) {
+        bytes[] memory proofs = new bytes[](3);
         for (uint i = 0; i < proofs.length; i++) {
-            bytes memory proof = allTrue || (!allFalse && i > 0) ? bytes("proof") : bytes("");
-            proofs[i] = IMultiproofOracle.ProofData({
-                publicValues: bytes(""),
-                proof: proof
-            });
+            proofs[i] = allTrue || (!allFalse && i > 0) ? bytes("proof") : bytes("");
         }
         return proofs;
     }
