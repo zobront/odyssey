@@ -323,9 +323,6 @@ contract OptimismPortal3 is Initializable, ResourceMetering, ISemver {
         (GameType gameType,, IDisputeGame gameProxy) = disputeGameFactory.gameAtIndex(_disputeGameIndex);
         Claim outputRoot = gameProxy.rootClaim();
 
-        // The game type of the dispute game must be the respected game type.
-        if (gameType.raw() != respectedGameType.raw()) revert InvalidGameType();
-
         // Verify that the output root can be generated with the elements in the proof.
         if (outputRoot.raw() != Hashing.hashOutputRootProof(_outputRootProof)) revert InvalidProof();
 
