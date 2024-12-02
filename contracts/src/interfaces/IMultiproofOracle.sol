@@ -8,7 +8,8 @@ interface IMultiproofOracle {
         uint40 challengeTime;
         uint88 proofReward;
         uint40 provingTime;
-        uint64 treasuryFeePctWad;
+        uint64 proverFeePctWad;
+        uint64 challengedFeePctWad;
         address treasury;
         uint16 emergencyPauseThreshold;
         uint40 emergencyPauseTime;

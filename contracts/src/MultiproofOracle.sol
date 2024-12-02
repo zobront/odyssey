@@ -22,8 +22,8 @@ contract MultiproofOracle is IMultiproofOracle {
     mapping(bytes32 => ProposalData[]) proposals;
     IProver[] public provers;
 
-    // TODO: Split into separate fees for proof and challenge, if necessary.
-    uint256 public treasuryFeePctWad;
+    uint256 public proverFeePctWad;
+    uint256 public challengedFeePctWad;
     address public treasury;
 
     uint256 public immutable emergencyPauseThreshold;
@@ -43,12 +43,14 @@ contract MultiproofOracle is IMultiproofOracle {
         provers = _provers;
 
         // set params - for details on how to set: https://github.com/zobront/odyssey/blob/multiproof/contracts/spec/params.md
-        require(_args.treasuryFeePctWad < 1e18, "treasury fee must be less than 100%");
+        require(_args.proverFeePctWad < 1e18, "prover fee must be less than 100%");
+        require(_args.challengedFeePctWad < 1e18, "challenged fee must be less than 100%");
         proposalBond = _args.proposalBond;
         challengeTime = _args.challengeTime;
         proofReward = _args.proofReward;
         provingTime = _args.provingTime;
-        treasuryFeePctWad = _args.treasuryFeePctWad;
+        proverFeePctWad = _args.proverFeePctWad;
+        challengedFeePctWad = _args.challengedFeePctWad;
         treasury = _args.treasury;
         emergencyPauseThreshold = _args.emergencyPauseThreshold;
         emergencyPauseTime = _args.emergencyPauseTime;
@@ -128,7 +130,7 @@ contract MultiproofOracle is IMultiproofOracle {
 
         if (successfulProofCount > 0) {
             uint rewards = proofReward * successfulProofCount;
-            uint treasuryFee = rewards * treasuryFeePctWad / 1e18;
+            uint treasuryFee = rewards * proverFeePctWad / 1e18;
             payable(treasury).transfer(treasuryFee);
             payable(msg.sender).transfer(rewards - treasuryFee);
         }
@@ -187,7 +189,7 @@ contract MultiproofOracle is IMultiproofOracle {
 
         proposal.state = ProposalState.Rejected;
 
-        uint treasuryFee = proposalBond * treasuryFeePctWad / 1e18;
+        uint treasuryFee = proposalBond * challengedFeePctWad / 1e18;
         uint proposalBondRewards = proposalBond - treasuryFee;
         uint challangeBondRefund = proofReward * (provers.length - successfulProofCount);
 

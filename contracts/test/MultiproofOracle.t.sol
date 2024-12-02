@@ -26,7 +26,8 @@ contract MultiproofOracleTest is Test {
             challengeTime: uint40(12 hours),
             proofReward: uint88(1 ether),
             provingTime: uint40(1 days),
-            treasuryFeePctWad: uint64(0.5e18),
+            proverFeePctWad: uint64(0.5e18),
+            challengedFeePctWad: uint64(0.5e18),
             treasury: address(makeAddr("treasury")),
             emergencyPauseThreshold: uint16(200),
             emergencyPauseTime: uint40(10 days)
