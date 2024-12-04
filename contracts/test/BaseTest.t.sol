@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import { MultiproofOracle } from "src/MultiproofOracle.sol";
 import { MockProver } from "src/mocks/MockProver.sol";
-import { IProver } from "src/interfaces/IProver.sol";
+import { IVerifier } from "src/interfaces/IVerifier.sol";
 import { IMultiproofOracle } from "src/interfaces/IMultiproofOracle.sol";
 import { Test, console } from "forge-std/Test.sol";
 
@@ -12,9 +12,9 @@ contract BaseTest is Test {
     IMultiproofOracle.Challenge public anchor;
 
     function setUp() public {
-        IProver[] memory provers = new IProver[](3);
-        for (uint i = 0; i < provers.length; i++) {
-            provers[i] = IProver(address(new MockProver()));
+        IVerifier[] memory verifiers = new IVerifier[](3);
+        for (uint i = 0; i < verifiers.length; i++) {
+            verifiers[i] = IVerifier(address(new MockProver()));
         }
 
         // set based on defaults here:
@@ -32,7 +32,7 @@ contract BaseTest is Test {
             rollupConfigHash: bytes32(0),
             vkey: bytes32(0)
         });
-        oracle = new MultiproofOracle(provers, 0, bytes32(0), args);
+        oracle = new MultiproofOracle(verifiers, 0, bytes32(0), args);
         vm.deal(address(oracle), 100 ether);
 
         anchor = IMultiproofOracle.Challenge({
