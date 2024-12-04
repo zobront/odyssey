@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { IProver } from "./interfaces/IProver.sol";
+import { IVerifier } from "./interfaces/IVerifier.sol";
 import { IMultiproofOracle } from "./interfaces/IMultiproofOracle.sol";
 
 contract MultiproofOracle is IMultiproofOracle {
@@ -15,7 +15,7 @@ contract MultiproofOracle is IMultiproofOracle {
     uint256 public immutable proposalBond;
     uint256 public immutable challengeTime;
 
-    uint256 public immutable proofReward; // to challenge, we must bond `proofReward * provers.length`
+    uint256 public immutable proofReward; // to challenge, we must bond `proofReward * verifiers.length`
     uint256 public immutable provingTime;
 
     bytes32 public immutable rollupConfigHash;
@@ -23,7 +23,7 @@ contract MultiproofOracle is IMultiproofOracle {
 
     // outputRoot => array of proposals
     mapping(bytes32 => ProposalData[]) proposals;
-    IProver[] public provers;
+    IVerifier[] public verifiers;
 
     uint256 public proverFeePctWad;
     uint256 public challengedFeePctWad;
@@ -44,9 +44,9 @@ contract MultiproofOracle is IMultiproofOracle {
     ///////// CONSTRUCTOR /////////
     ///////////////////////////////
 
-    constructor(IProver[] memory _provers, uint96 _initialBlockNum, bytes32 _initialOutputRoot, ImmutableArgs memory _args) payable {
-        require(_provers.length < 40); // proven bitmap has to fit in uint40
-        provers = _provers;
+    constructor(IVerifier[] memory _verifiers, uint96 _initialBlockNum, bytes32 _initialOutputRoot, ImmutableArgs memory _args) payable {
+        require(_verifiers.length < 40); // proven bitmap has to fit in uint40
+        verifiers = _verifiers;
 
         // set params - for details on how to set: https://github.com/zobront/odyssey/blob/multiproof/contracts/spec/params.md
         require(_args.proverFeePctWad < 1e18, "prover fee must be less than 100%");
@@ -103,7 +103,7 @@ contract MultiproofOracle is IMultiproofOracle {
 
     function challenge(bytes32 outputRoot, uint256 index) public payable {
         require(!emergencyShutdown, "emergency shutdown");
-        require(msg.value == proofReward * provers.length, "incorrect bond amount");
+        require(msg.value == proofReward * verifiers.length, "incorrect bond amount");
 
         ProposalData storage proposal = proposals[outputRoot][index];
         require(proposal.state == ProposalState.Unchallenged, "can only challenge unchallenged proposals");
@@ -122,7 +122,7 @@ contract MultiproofOracle is IMultiproofOracle {
         require(historicBlockhashes[l1BlockHash], "blockhash not checkpointed");
 
         // verify ZK proofs
-        require(proofs.length == provers.length, "incorrect number of proofs");
+        require(proofs.length == verifiers.length, "incorrect number of proofs");
 
         uint successfulProofCount;
         for (uint256 i = 0; i < proofs.length; i++) {
@@ -130,7 +130,7 @@ contract MultiproofOracle is IMultiproofOracle {
                 continue;
             }
 
-            bytes memory pvs = provers[i].encode(PublicValuesStruct({
+            bytes memory pvs = verifiers[i].encode(PublicValuesStruct({
                 l1BlockHash: l1BlockHash,
                 l2PreRoot: proposal.parent.outputRoot,
                 claimRoot: outputRoot,
@@ -142,7 +142,7 @@ contract MultiproofOracle is IMultiproofOracle {
             // Note: It IS possible to verify valid proofs against invalid parents.
             // Challengers should not challenge proofs of invalid parents, as they will lose their bonds.
             // As long as the parent is rejected, children will be rejected too.
-            if (provers[i].verify(abi.encode(pvs), proofs[i])) {
+            if (verifiers[i].verify(abi.encode(pvs), proofs[i])) {
                 proposal.provenBitmap |= uint40(1 << i);
                 successfulProofCount++;
             }
@@ -171,7 +171,7 @@ contract MultiproofOracle is IMultiproofOracle {
         }
 
         uint successfulProofCount;
-        for (uint i = 0; i < provers.length; i++) {
+        for (uint i = 0; i < verifiers.length; i++) {
             if (proposal.provenBitmap & (1 << i) != 0) {
                 successfulProofCount++;
             }
@@ -182,7 +182,7 @@ contract MultiproofOracle is IMultiproofOracle {
             proposal.state = ProposalState.Rejected;
 
             if (proposal.challenger != address(0)) {
-                payable(proposal.challenger).transfer(proposalBond + proofReward * (provers.length - successfulProofCount));
+                payable(proposal.challenger).transfer(proposalBond + proofReward * (verifiers.length - successfulProofCount));
             } else {
                 payable(msg.sender).transfer(proposalBond);
             }
@@ -191,7 +191,7 @@ contract MultiproofOracle is IMultiproofOracle {
         }
 
         // If it was challenged and all proven, we don't need to wait for the deadline.
-        if (successfulProofCount == provers.length) {
+        if (successfulProofCount == verifiers.length) {
             proposal.state = ProposalState.Confirmed;
             payable(proposal.proposer).transfer(proposalBond);
             return;
@@ -211,7 +211,7 @@ contract MultiproofOracle is IMultiproofOracle {
 
         uint treasuryFee = proposalBond * challengedFeePctWad / 1e18;
         uint proposalBondRewards = proposalBond - treasuryFee;
-        uint challangeBondRefund = proofReward * (provers.length - successfulProofCount);
+        uint challangeBondRefund = proofReward * (verifiers.length - successfulProofCount);
 
         payable(treasury).transfer(treasuryFee);
         payable(proposal.challenger).transfer(proposalBondRewards + challangeBondRefund);
