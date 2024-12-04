@@ -130,16 +130,14 @@ contract MultiproofOracle is IMultiproofOracle {
                 continue;
             }
 
-            // TODO: We will need to support different public values for each proof type
-            // This probably means different vks, etc, but need to see how those proof systems work
-            PublicValuesStruct memory pvs = PublicValuesStruct({
+            bytes memory pvs = provers[i].encode(PublicValuesStruct({
                 l1BlockHash: l1BlockHash,
                 l2PreRoot: proposal.parent.outputRoot,
                 claimRoot: outputRoot,
                 l2BlockNum: proposal.blockNum,
                 rollupConfigHash: rollupConfigHash,
                 vkey: vkey
-            });
+            }));
 
             // Note: It IS possible to verify valid proofs against invalid parents.
             // Challengers should not challenge proofs of invalid parents, as they will lose their bonds.
